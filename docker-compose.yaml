@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  nats:
+    image: nats
+    ports:
+      - "8222:8222"
+      - "4222:4222"
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222 --name 'nats' -js -sd '/data' --http_port 8222 -c /nats.conf"
+    networks: ["nats"]
+    environment:
+      - NATS_ADMIN_USER=${NATS_ADMIN_USER:-admin}
+      - NATS_ADMIN_PASSWORD=${NATS_ADMIN_PASSWORD:-admin1984}
+      - NATS_USERNAME=${NATS_USERNAME:-test}
+      - NATS_PASSWORD=${NATS_PASSWORD:-test1984}
+    volumes:
+      - ./data/n-0:/data
+      - ./nats.conf:/nats.conf
+
+  nats-1:
+    image: nats
+    ports:
+      - "4223:4222"
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222 --name 'nats-1' -js -sd '/data' -c /nats.conf"
+    networks: ["nats"]
+    environment:
+      - NATS_ADMIN_USER=${NATS_ADMIN_USER:-admin}
+      - NATS_ADMIN_PASSWORD=${NATS_ADMIN_PASSWORD:-admin1984}
+      - NATS_USERNAME=${NATS_USERNAME:-test}
+      - NATS_PASSWORD=${NATS_PASSWORD:-test1984}
+    depends_on: ["nats"]
+    volumes:
+      - ./data/n-1:/data
+      - ./nats.conf:/nats.conf
+
+  nats-2:
+    image: nats
+    ports:
+      - "4224:4222"
+    command: "--cluster_name NATS --cluster nats://0.0.0.0:6222 --routes=nats://ruser:T0pS3cr3t@nats:6222 --name 'nats-2' -js -sd '/data' -c /nats.conf"
+    networks: ["nats"]
+    environment:
+      - NATS_ADMIN_USER=${NATS_ADMIN_USER:-admin}
+      - NATS_ADMIN_PASSWORD=${NATS_ADMIN_PASSWORD:-admin1984}
+      - NATS_USERNAME=${NATS_USERNAME:-test}
+      - NATS_PASSWORD=${NATS_PASSWORD:-test1984}
+    depends_on: ["nats"]
+    volumes:
+      - ./data/n-2:/data
+      - ./nats.conf:/nats.conf
+
+  nats-setup:
+    restart: on-failure
+    image: debian
+    depends_on: ["nats", "nats-1", "nats-2"]
+    networks: ["nats"]
+    environment:
+      - NATS_ADMIN_USER=${NATS_ADMIN_USER:-admin}
+      - NATS_ADMIN_PASSWORD=${NATS_ADMIN_PASSWORD:-admin1984}
+      - NATS_USERNAME=${NATS_USERNAME:-test}
+      - NATS_PASSWORD=${NATS_PASSWORD:-test1984}
+    entrypoint: >
+      /bin/sh -c "
+      apt update && \
+      apt upgrade -y && \
+      apt install wget watch -y && \
+      wget https://github.com/nats-io/natscli/releases/download/v0.0.30/nats-0.0.30-arm64.deb && \
+      dpkg -i nats-0.0.30-arm64.deb && \
+      nats --version && \
+      chmod +x /tmp/config.sh && bash -x /tmp/config.sh && \
+      tail -F keepmerunning;
+      "
+    volumes:
+      - ./nats-config.sh:/tmp/config.sh
+      - ./nats-bashrc:/root/.bashrc
+
+networks:
+  nats:
+    name: nats
+
